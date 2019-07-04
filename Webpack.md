@@ -289,6 +289,181 @@ module.exports = {
 }
 ```
 
+## 6. 生产环境构建
+
+开发环境(development)和生产环境(production)的构建目标差异很大。在开发环境中，我们需要具有强大的、具有实时重新加载(live reloading)或热模块替换(hot module replacement)能力的 source map 和 localhost server。而在生产环境中，我们的目标则转向于关注更小的 bundle，更轻量的 source map，以及更优化的资源，以改善加载时间。由于要遵循逻辑分离，我们通常建议为每个环境编写彼此独立的 webpack 配置。
+
+### tree shaking
+
+tree shaking 是一个术语，通常用于描述移除 JavaScript 上下文中的未引用代码(dead-code)。它依赖于 ES2015 模块系统中的静态结构特性，例如 import 和 export。这个术语和概念实际上是兴起于 ES2015 模块打包工具 rollup。
+
+新的 webpack 4 正式版本，扩展了这个检测能力，通过 package.json 的 "sideEffects" 属性作为标记，向 compiler 提供提示，表明项目中的哪些文件是 "pure(纯的 ES2015 模块)"，由此可以安全地删除文件中未使用的部分。
+
+> 支持es6的import模块，不支持commonjs 模块，因为commonjs 是动态引入，而es6是静态引入
+
+```
+// webpack.dev.js
+  optimization: {   // 开发环境时使用
+        usedExports: true
+    },
+        
+// package.json
+  "sideEffects": [
+    "*.css"
+  ],
+
+// 如果在项目中使用类似 css-loader 并 import 一个 CSS 文件，则需要将其添加到 side effect 列表中，以免在生产模式中无意中将它删除
+```
+***注意：mode 选项设置为 production，可以自动启用 minification(代码压缩) 和 tree shaking***
+
+### 代码压缩
+
+默认 mode：production 自动可以代码压缩，也可以配合uglifyjs-webpack-plugin 使用
+
+`npm i uglifyjs-webpack-plugin --save-dev`
+
+```
+// webpack.prod.js
+
+const UglifyJSPlugin = require('uglifyjs-webpack-plugin ')
+
+plugins: [
+  new UglifyJSPlugin()
+]
+
+```
+
+### 制定生产环境
+
+许多 library 将通过与 process.env.NODE_ENV 环境变量关联，以决定 library 中应该引用哪些内容。例如，当不处于生产环境中时，某些 library 为了使调试变得容易，可能会添加额外的日志记录(log)和测试(test)。其实，当使用 process.env.NODE_ENV === 'production' 时，一些 library 可能针对具体用户的环境进行代码优化，从而删除或添加一些重要代码。我们可以使用 webpack 内置的 DefinePlugin 为所有的依赖定义这个变量：
+
+```
+// 通常指定 mode：production 就可以，对于旧版本的webpack 可以通过指定
+
+  new webpack.DefinePlugin({
+    'process.env.NODE_ENV': JSON.stringify('production')
+  })
+
+```
+
+### js css 代码分离
+
+把代码分离到不同的 bundle 中，然后可以按需加载或并行加载这些文件。代码分离可以用于获取更小的 bundle，以及控制资源加载优先级，如果使用合理，会极大影响加载时间。
+
+#### js代码分离
+
+```
+optimization: {
+  splitChunks: {
+      chunks: "all",    // 只对异步引入代码起作用，设置all时并同时配置vendors才对两者起作用
+      minSize: 30000,   // 引入的库大于30kb时才会做代码分割
+      minChunks: 1,     // 一个模块至少被用了1次才会被分割
+      maxAsyncRequests: 5,     // 同时异步加载的模块数最多是5个，如果超过5个则不做代码分割
+      maxInitialRequests: 3,   // 入口文件进行加载时，引入的库最多分割出3个js文件
+      automaticNameDelimiter: '~',  // 生成文件名的文件链接符
+      name: true,   // 开启自定义名称效果
+      cacheGroups: {  // 判断分割出的代码放到那里去
+          vendors: {   // 配合chunks：‘all’使用，表示如果引入的库是在node-modules中，那就会把这个库分割出来并起名为vendors.js
+              test: /[\/]node_modules[\/]/,
+              priority: -10,
+              filename: 'vendors.js'
+          },
+          default: {  // 为非node-modules库中分割出的代码设置默认存放名称
+              priority: -20,
+              reuseExistingChunk: true, // 避免被重复打包分割
+              filename: 'common.js'
+          }
+      }
+  }
+}
+
+```
+
+#### css 代码分割
+
+`npm i extract-text-webpack-plugin --save-dev`
+
+它会将所有的入口 chunk(entry chunks)中引用的 *.css，移动到独立分离的 CSS 文件。因此，你的样式将不再内嵌到 JS bundle 中，而是会放到一个单独的 CSS 文件（即 styles.css）当中。 如果你的样式文件大小较大，这会做更快提前加载，因为 CSS bundle 会跟 JS bundle 并行加载。
+
+```
+const ExtractTextPlugin = require('extract-text-webpack-plugin');
+
+module.exports = {
+  module: {
+    rules: [
+      {
+        test: /\.scss$/,
+        use: ExtractTextPlugin.extract({
+          fallback: 'style-loader',
+          //如果需要，可以在 sass-loader 之前将 resolve-url-loader 链接进来
+          use: ['css-loader', 'sass-loader']
+        })
+      }
+    ]
+  },
+  plugins: [
+    new ExtractTextPlugin('style.css')
+    //如果想要传入选项，你可以这样做：
+    //new ExtractTextPlugin({
+    //  filename: 'style.css'
+    //})
+  ]
+}
+```
+
+_网上的另一种解决方案_
+
+想要分开打包我们的css文件，需要使用mini-css-extract-plugin这个插件，但是这个插件目前还不支持HMR,为了不影响开发效率，因此就在生成环境下使用该插件。
+optimize-css-assets-webpack-plugin 这个插件可以帮助我们把相同的样式合并。
+css-split-webpack-plugin插件可以帮我们把过大的css文件拆分
+
+`npm install mini-css-extract-plugin optimize-css-assets-webpack-plugin css-split-webpack-plugin --save-dev`
+
+```
+const MiniCssExtractPlugin = require('mini-css-extract-plugin');
+const OptimizeCSSAssetsPlugin = require("optimize-css-assets-webpack-plugin");
+const CSSSplitWebpackPlugin = require('css-split-webpack-plugin').default;
+...
+    module: {
+        rules: [{
+            test: /.less$/,
+            exclude: /node_modules/,
+            use: [MiniCssExtractPlugin.loader,
+                {
+                    loader: 'css-loader',
+                    options: {
+                        importLoaders: 2
+                    }
+                }, 'less-loader', 'postcss-loader']
+        },
+        {
+            test: /.css$/,
+            use: [MiniCssExtractPlugin.loader, 'css-loader', 'postcss-loader']
+        }]
+    },
+    optimization: {
+minimizer: [new OptimizeCSSAssetsPlugin({})]
+},
+plugins: [
+new MiniCssExtractPlugin({
+filename: '[name].css',
+chunkFilename: '[name].chunk.css'
+}),
+      new CSSSplitWebpackPlugin({
+            size: 4000,
+            filename: '[name]-[part].[ext]'
+      })
+   ]
+```
+
+
+
+
+
+
+
+
+
 
 
 
