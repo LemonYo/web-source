@@ -121,8 +121,11 @@ moule.exports = {
 }
 ```
 解析 react jsx 语法
+
 `npm i react react-router-dom react-dom --save`
+
 `npm i @babel/preset-react --save-dev`
+
 ```javascript
 moule.exports = {
   module: {
@@ -171,6 +174,27 @@ module.exports = {
   "plugins": ["@babel/plugin-transform-runtime"]
 }
 ```
+> useBuiltIns、transform-runtime配到一起是错的，真是误人子弟。如果用useBuiltIns，就安装core-js@2到生产环境
+，core-js@2相当于@babel/polyfill，可以按需加载。如果使用transform-runtime就不要配useBuiltInsor。所以开发一个项目可以这么配。
+`npm install --save core-js@2`
+```javascript
+//.babelrc
+{
+    "presets":[
+        ["@babel/preset-env",{
+            "modules": false,
+            "targets":{
+                "browsers":[">1%","last 2 versions"]
+            },
+            "useBuiltIns":"usage"
+        }]
+    ],
+    "plugins": [
+        "syntax-dynamic-import",// 异步加载语法编译插件
+        "lodash"
+    ]
+}
+```
 
 ### 处理图片,字体文件
 
@@ -210,6 +234,61 @@ module: {
   ]
 }
 ```
+更多的文件处理翻阅对应的loader
+
+## 3. 管理输出
+
+利用html-webpack-plugin 生成对应的html模板，并将我们生成的js， css， img，font 引入到我们的html中，在生产环境下，我们频繁跟换我们的webpack配置，为了避免dist 文件夹下的文件混乱，在bulid 的时候 建议使用 clean-webpack-plugin 清除dist文件下的旧数据
+
+`npm i html-webpack-plugin clean-webpack-plugin --save-dev`
+
+```javascript
+// webpack.prod.js
+const cleanWebpackPlugin = require('clean-webpack-plugin')
+const htmlWebpackPlugin = require('html-webpack-plugin')
+module.exports = {
+  plugins: [
+    new cleanWebpackPlugin(),
+    new htmlWebpackPlugin({
+      title：String,
+      filename: String, // 默认是 index.html
+      template：'', // 模板的路径
+    })
+  ]
+}
+```
+## 4.source-map
+sourceMap本质上是一种映射关系，打包出来的js文件中的代码可以映射到代码文件的具体位置,这种映射关系会帮助我们直接找到在源代码中的错误。可以直接在devtool中使用.合理的使用source-map可以帮助我们提高开发效率，更快的定位到错误位置。
+生产环境和开发环境的devtool配置是不同的。我们可以在webpack.dev.js中添加devtoo
+
+```javascript
+devtool:"cheap-module-eval-source-map",// 开发环境配置最佳实践
+devtool:"cheap-module-source-map",   // 生产配置最佳实践
+```
+## 5.模块热替换
+
+`npm i webpack-dev-server --save-dev`
+
+```
+// webapack.dev.js
+
+module.exports = {
+  devServer: {
+    hot: true, // 开启热更新模块
+    open：true， // 项目启动自动打开系统默认浏览器
+    compress: true, // 是否启用gzip压缩
+    host： '192.168.0.8', // 指定主机的host，
+    port：'8080',
+    proxy: {
+      "/api": {
+        target: proxyIp,
+        changeOrigin: true
+      }
+    }
+  }
+}
+```
+
 
 
 
