@@ -253,6 +253,10 @@ module.exports = {
       title：String,
       filename: String, // 默认是 index.html
       template：'', // 模板的路径
+      hash：true, // 防止缓存
+      minfy： {
+        removeAttributeQuates: true // 压缩并且去掉引号
+      }
     })
   ]
 }
@@ -289,11 +293,13 @@ module.exports = {
 }
 ```
 
+react: [react-hot-loader]("https://www.npmjs.com/package/react-hot-loader")
+
 ## 6. 生产环境构建
 
 开发环境(development)和生产环境(production)的构建目标差异很大。在开发环境中，我们需要具有强大的、具有实时重新加载(live reloading)或热模块替换(hot module replacement)能力的 source map 和 localhost server。而在生产环境中，我们的目标则转向于关注更小的 bundle，更轻量的 source map，以及更优化的资源，以改善加载时间。由于要遵循逻辑分离，我们通常建议为每个环境编写彼此独立的 webpack 配置。
 
-### tree shaking
+### js tree shaking
 
 tree shaking 是一个术语，通常用于描述移除 JavaScript 上下文中的未引用代码(dead-code)。它依赖于 ES2015 模块系统中的静态结构特性，例如 import 和 export。这个术语和概念实际上是兴起于 ES2015 模块打包工具 rollup。
 
@@ -315,6 +321,29 @@ tree shaking 是一个术语，通常用于描述移除 JavaScript 上下文中�
 // 如果在项目中使用类似 css-loader 并 import 一个 CSS 文件，则需要将其添加到 side effect 列表中，以免在生产模式中无意中将它删除
 ```
 ***注意：mode 选项设置为 production，可以自动启用 minification(代码压缩) 和 tree shaking***
+
+
+### css tree shaking
+
+`npm i glob-all purify-css purifycss-webpack --save-dev`
+
+```
+const PurifyCSS = require('purifycss-webpack')
+const glob = require('glob-all')
+plugins:[
+    // 清除无用 css
+    new PurifyCSS({
+      paths: glob.sync([
+        // 要做 CSS Tree Shaking 的路径文件
+        path.resolve(__dirname, './src/*.html'), // 请注意，我们同样需要对 html 文件进行 tree shaking
+        path.resolve(__dirname, './src/*.js')
+      ])
+    })
+]
+
+参考至链接：https://juejin.im/post/5cfe4b13f265da1bb13f26a8
+
+```
 
 ### 代码压缩
 
@@ -455,6 +484,60 @@ chunkFilename: '[name].chunk.css'
       })
    ]
 ```
+
+## alias对文件路径优化
+
+extension: 指定extension之后可以不用在require或是import的时候加文件扩展名,会依次尝试添加扩展名进行匹配
+
+alias: 配置别名可以加快webpack查找模块的速度
+
+```
+resolve: {
+  extension: ["", ".js", ".jsx"],
+  alias: {
+    "@": path.join(__dirname, "src"),
+    pages: path.join(__dirname, "src/pages"),
+    router: path.join(__dirname, "src/router")
+  }
+}
+  
+```
+
+
+## 使用静态资源路径publicPath（CDN）
+
+CDN通过将资源部署到世界各地，使得用户可以就近访问资源，加快访问速度。要接入CDN，需要把网页的静态资源上传到CDN服务上，在访问这些资源时，使用CDN服务提供的URL。
+
+```
+output: {
+  filename: '[name].js',
+  path: path.resolve(__dirname, '../dist'),
+  publicPath: '//Cdn'
+}
+```
+
+## 懒加载
+
+懒加载或者按需加载，是一种很好的优化网页或应用的方式。这种方式实际上是先把你的代码在一些逻辑断点处分离开，然后在一些代码块中完成某些操作后，立即引用或即将引用另外一些新的代码块。这样加快了应用的初始加载速度，减轻了它的总体体积，因为某些代码块可能永远不会被加载。
+
+```
+  import _ from 'lodash';
+
+- async function getComponent() {
+    const _ = await import(/* webpackChunkName: "lodash" */ 'lodash');
+  }
+
+- getComponent().then(component => {
+-   document.body.appendChild(component);
+- });
++ document.body.appendChild(component());
+
+```
+许多框架和类库对于如何用它们自己的方式来实现（懒加载）都有自己的建议。这里有一些例子：
+
+React: [Code Splitting and Lazy Loading]("https://reacttraining.com/react-router/web/guides/code-splitting")
+
+vue: [Lazy Load in Vue using Webpack's code splitting]("https://alexjover.com/blog/lazy-load-in-vue-using-webpack-s-code-splitting/")
 
 
 
