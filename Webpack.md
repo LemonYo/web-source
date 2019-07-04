@@ -535,9 +535,9 @@ output: {
 ```
 许多框架和类库对于如何用它们自己的方式来实现（懒加载）都有自己的建议。这里有一些例子：
 
-React: [Code Splitting and Lazy Loading]("https://reacttraining.com/react-router/web/guides/code-splitting")
+React: [Code Splitting and Lazy Loading](https://reacttraining.com/react-router/web/guides/code-splitting)
 
-vue: [Lazy Load in Vue using Webpack's code splitting]("https://alexjover.com/blog/lazy-load-in-vue-using-webpack-s-code-splitting/")
+vue: [Lazy Load in Vue using Webpack's code splitting](https://alexjover.com/blog/lazy-load-in-vue-using-webpack-s-code-splitting/)
 
 
 
