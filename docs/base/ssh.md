@@ -10,7 +10,7 @@ ssh key 通常所在的目录在 C:/user/yourName/.ssh
 
 `cd ~/.ssh`
 
-![avatar](https://raw.githubusercontent.com/LemonYo/web-source/master/doc_source/156257934.jpg)
+![avatar](/156257934.jpg)
 
 ## 2.如何生成一个ssh key
 
